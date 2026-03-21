@@ -1,0 +1,14 @@
+services:
+  backend:
+    build: ./backend
+    env_file: ./backend/.env
+    restart: unless-stopped
+    # Not exposed externally — only reachable by the frontend container
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
