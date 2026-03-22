@@ -241,7 +241,7 @@ def torrent_search():
         return error("q parameter is required", 400)
     try:
         resp = req.get(
-            "http://localhost:8000/api/data/",
+            "http://192.168.1.18:8000/api/data/",
             params={"key": query},
             timeout=10,
         )
