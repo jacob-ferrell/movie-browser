@@ -107,8 +107,20 @@ def qbt_add():
             magnet,
             save_path=body.get("savepath"),
             category=body.get("category"),
+            sequential=bool(body.get("sequential", False)),
         )
         return jsonify({"ok": True})
+    except Exception as e:
+        return error(str(e))
+
+
+@app.get("/api/qbt/file-path/<torrent_hash>")
+def qbt_file_path(torrent_hash):
+    try:
+        path = qbt.get_video_file_path(torrent_hash)
+        if path is None:
+            return error("no video file found for this torrent", 404)
+        return jsonify({"path": path})
     except Exception as e:
         return error(str(e))
 

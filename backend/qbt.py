@@ -12,14 +12,42 @@ def _client():
     )
 
 
-def add_magnet(magnet_link, save_path=None, category=None):
+def add_magnet(magnet_link, save_path=None, category=None, sequential=False):
     with _client() as client:
         kwargs = {"urls": magnet_link}
         if save_path:
             kwargs["save_path"] = save_path
         if category:
             kwargs["category"] = category
+        if sequential:
+            kwargs["is_sequential_download"] = True
+            kwargs["is_first_last_piece_priority"] = True
         client.torrents_add(**kwargs)
+
+
+def get_video_file_path(torrent_hash):
+    """Return the absolute path of the largest video file in a torrent."""
+    video_exts = {".mkv", ".mp4", ".avi", ".mov", ".m4v", ".wmv", ".ts", ".m2ts"}
+    with _client() as client:
+        info = client.torrents_info(torrent_hashes=torrent_hash)
+        if not info:
+            return None
+        torrent = info[0]
+        save_path = (torrent.get("save_path") or "").rstrip("/")
+        files = client.torrents_files(torrent_hash=torrent_hash)
+        best = None
+        best_size = -1
+        for f in files:
+            name = f.get("name", "")
+            ext = os.path.splitext(name)[1].lower()
+            if ext in video_exts:
+                size = f.get("size", 0)
+                if size > best_size:
+                    best_size = size
+                    best = name
+        if best is None:
+            return None
+        return f"{save_path}/{best}"
 
 
 def list_save_folders(base_path):
