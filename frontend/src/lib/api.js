@@ -25,6 +25,10 @@ export function fetchSearch(query, page = 1) {
   return get(`/search?q=${encodeURIComponent(query)}&page=${page}`)
 }
 
+export function fetchDetail(type, id) {
+  return get(`/detail?type=${type}&id=${id}`)
+}
+
 export function fetchProviders(type, id, region = 'US') {
   return get(`/providers?type=${type}&id=${id}&region=${region}`)
 }
@@ -44,6 +48,32 @@ export async function addMagnet(magnet, savepath = '', category = '') {
 
 export function fetchTorrents() {
   return get('/qbt/torrents')
+}
+
+export async function markWatchedByHashes(hashes) {
+  const resp = await fetch(`${BASE}/qbt/mark-watched`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hashes }),
+  })
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}))
+    throw new Error(body.error || `HTTP ${resp.status}`)
+  }
+  return resp.json()
+}
+
+export async function deleteTorrents(hashes, deleteFiles = false) {
+  const resp = await fetch(`${BASE}/qbt/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hashes, delete_files: deleteFiles }),
+  })
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}))
+    throw new Error(body.error || `HTTP ${resp.status}`)
+  }
+  return resp.json()
 }
 
 export function fetchFolders(base = 'tv') {

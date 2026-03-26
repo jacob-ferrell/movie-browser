@@ -126,6 +126,20 @@ def get_tv_episodes(tmdb_id, season_number):
     return episodes
 
 
+def get_detail(media_type, tmdb_id):
+    data = _get(f"/{media_type}/{tmdb_id}")
+    base = _normalize({**data, "media_type": media_type})
+    base["genres"] = [g["name"] for g in data.get("genres", [])]
+    base["tagline"] = data.get("tagline", "")
+    base["status"] = data.get("status", "")
+    if media_type == "movie":
+        base["runtime"] = data.get("runtime")
+    else:
+        base["number_of_seasons"] = data.get("number_of_seasons")
+        base["number_of_episodes"] = data.get("number_of_episodes")
+    return base
+
+
 def get_watch_providers(media_type, tmdb_id, region="US"):
     data = _get(f"/{media_type}/{tmdb_id}/watch/providers")
     region_data = data.get("results", {}).get(region, {})

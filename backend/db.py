@@ -104,6 +104,28 @@ def add_download(tmdb_id, media_type, title, poster_url, save_path,
         return cur.fetchone()[0]
 
 
+def mark_watched_by_hashes(hashes):
+    """Look up items by torrent hash in downloads and mark them as watched.
+    Returns the number of distinct items marked."""
+    if not hashes:
+        return 0
+    placeholders = ','.join(['%s'] * len(hashes))
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(f"""
+            SELECT DISTINCT tmdb_id, media_type, title, poster_url
+            FROM downloads
+            WHERE torrent_hash IN ({placeholders})
+        """, hashes)
+        items = cur.fetchall()
+
+    count = 0
+    for tmdb_id, media_type, title, poster_url in items:
+        upsert_item(tmdb_id, media_type, title, poster_url)
+        set_flag(tmdb_id, media_type, 'watched', True)
+        count += 1
+    return count
+
+
 def get_show_folder(tmdb_id):
     """Return the show-level folder name for a TV show from the most recent download."""
     with _conn() as conn, conn.cursor() as cur:

@@ -38,6 +38,11 @@ def list_save_folders(base_path):
         return sorted(folders, key=str.lower)
 
 
+def delete_torrents(hashes, delete_files=False):
+    with _client() as client:
+        client.torrents_delete(delete_files=delete_files, torrent_hashes=hashes)
+
+
 def list_torrents():
     with _client() as client:
         torrents = client.torrents_info()

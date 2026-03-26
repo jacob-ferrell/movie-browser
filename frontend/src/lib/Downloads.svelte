@@ -1,5 +1,5 @@
 <script>
-  import { addMagnet, fetchTorrents } from './api.js'
+  import { addMagnet, fetchTorrents, deleteTorrents, markWatchedByHashes } from './api.js'
 
   let magnet = $state('')
   let mediaType = $state('movie') // 'movie' | 'tv'
@@ -67,6 +67,73 @@
 
   let torrents = $state([])
   let listError = $state(null)
+
+  // Selection state
+  let selected = $state(new Set())
+  let deleteFiles = $state(false)
+  let alsoMarkWatched = $state(false)
+  let deleting = $state(false)
+  let deleteError = $state(null)
+  let confirmOpen = $state(false)
+
+  let allSelected = $derived(torrents.length > 0 && selected.size === torrents.length)
+  let someSelected = $derived(selected.size > 0)
+
+  function toggleSelect(hash) {
+    const next = new Set(selected)
+    if (next.has(hash)) next.delete(hash)
+    else next.add(hash)
+    selected = next
+  }
+
+  function toggleAll() {
+    if (allSelected) {
+      selected = new Set()
+    } else {
+      selected = new Set(torrents.map(t => t.hash))
+    }
+  }
+
+  async function handleMarkWatched() {
+    deleting = true
+    deleteError = null
+    try {
+      await markWatchedByHashes([...selected])
+      selected = new Set()
+    } catch (e) {
+      deleteError = e.message
+    } finally {
+      deleting = false
+    }
+  }
+
+  async function handleDelete() {
+    deleting = true
+    deleteError = null
+    try {
+      const hashes = [...selected]
+      await Promise.all([
+        deleteTorrents(hashes, deleteFiles),
+        alsoMarkWatched ? markWatchedByHashes(hashes) : Promise.resolve(),
+      ])
+      selected = new Set()
+      deleteFiles = false
+      alsoMarkWatched = false
+      confirmOpen = false
+      await load()
+    } catch (e) {
+      deleteError = e.message
+    } finally {
+      deleting = false
+    }
+  }
+
+  function deleteConfirmLabel() {
+    if (alsoMarkWatched && deleteFiles) return 'Delete, Remove Files & Mark Watched'
+    if (alsoMarkWatched) return 'Delete & Mark Watched'
+    if (deleteFiles) return 'Delete & Remove Files'
+    return 'Delete Torrent'
+  }
 
   const STATE_LABELS = {
     downloading: { label: 'Downloading', color: 'bg-teal-600/20 text-teal-400' },
@@ -222,45 +289,164 @@
         No torrents yet. Add a magnet link above.
       </div>
     {:else}
+      <!-- Select-all bar -->
+      <div class="flex items-center gap-3 pl-9">
+        <button onclick={toggleAll} class="text-sm text-gray-400 hover:text-gray-200 transition select-none">
+          {allSelected ? 'Deselect all' : 'Select all'}
+        </button>
+        {#if someSelected}
+          <span class="text-xs text-gray-500">{selected.size} selected</span>
+        {/if}
+
+        {#if someSelected}
+          <div class="ml-auto flex gap-2">
+            <button
+              onclick={handleMarkWatched}
+              disabled={deleting}
+              class="px-3 py-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-xs font-medium text-white transition"
+            >
+              Mark Watched
+            </button>
+            <button
+              onclick={() => { confirmOpen = true; deleteError = null }}
+              class="px-3 py-1 bg-red-700 hover:bg-red-600 rounded-lg text-xs font-medium text-white transition"
+            >
+              Delete {selected.size === 1 ? '1 torrent' : `${selected.size} torrents`}
+            </button>
+          </div>
+        {/if}
+      </div>
+
       {#each torrents as t (t.hash)}
         {@const si = stateInfo(t.state)}
-        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-2">
-          <div class="flex items-start justify-between gap-3">
-            <p class="text-sm text-gray-100 font-medium leading-snug flex-1 min-w-0 truncate" title={t.name}>
-              {t.name}
-            </p>
-            <span class="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full {si.color}">
-              {si.label}
-            </span>
-          </div>
+        {@const isSelected = selected.has(t.hash)}
+        <div class="flex items-center gap-2">
+          <!-- Circular toggle -->
+          <button
+            onclick={() => toggleSelect(t.hash)}
+            class="shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition
+              {isSelected
+                ? 'bg-teal-500 text-white'
+                : 'bg-gray-800 border border-gray-600 text-transparent hover:border-gray-400'}"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+            </svg>
+          </button>
 
-          <!-- Progress bar -->
-          <div class="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
-            <div
-              class="h-full rounded-full transition-all duration-500 {t.progress >= 1 ? 'bg-green-500' : 'bg-teal-500'}"
-              style="width: {(t.progress * 100).toFixed(1)}%"
-            ></div>
-          </div>
+        <div
+          class="flex-1 bg-gray-900 border rounded-xl p-4 flex flex-col gap-2 transition {isSelected ? 'border-teal-600/60' : 'border-gray-800'}"
+        >
+            <div class="flex items-start justify-between gap-3">
+              <p class="text-sm text-gray-100 font-medium leading-snug flex-1 min-w-0 truncate" title={t.name}>
+                {t.name}
+              </p>
+              <span class="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full {si.color}">
+                {si.label}
+              </span>
+            </div>
 
-          <!-- Stats row -->
-          <div class="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
-            <span>{(t.progress * 100).toFixed(1)}%</span>
-            <span>{fmtSize(t.size)}</span>
-            {#if t.dlspeed > 0}
-              <span class="text-teal-500">↓ {fmtSpeed(t.dlspeed)}</span>
-            {/if}
-            {#if t.upspeed > 0}
-              <span class="text-green-500">↑ {fmtSpeed(t.upspeed)}</span>
-            {/if}
-            {#if fmtEta(t.eta)}
-              <span>ETA {fmtEta(t.eta)}</span>
-            {/if}
-            {#if t.category}
-              <span class="bg-gray-800 px-1.5 py-0.5 rounded text-gray-400">{t.category}</span>
-            {/if}
-          </div>
+            <!-- Progress bar -->
+            <div class="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
+              <div
+                class="h-full rounded-full transition-all duration-500 {t.progress >= 1 ? 'bg-green-500' : 'bg-teal-500'}"
+                style="width: {(t.progress * 100).toFixed(1)}%"
+              ></div>
+            </div>
+
+            <!-- Stats row -->
+            <div class="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+              <span>{(t.progress * 100).toFixed(1)}%</span>
+              <span>{fmtSize(t.size)}</span>
+              {#if t.dlspeed > 0}
+                <span class="text-teal-500">↓ {fmtSpeed(t.dlspeed)}</span>
+              {/if}
+              {#if t.upspeed > 0}
+                <span class="text-green-500">↑ {fmtSpeed(t.upspeed)}</span>
+              {/if}
+              {#if fmtEta(t.eta)}
+                <span>ETA {fmtEta(t.eta)}</span>
+              {/if}
+              {#if t.category}
+                <span class="bg-gray-800 px-1.5 py-0.5 rounded text-gray-400">{t.category}</span>
+              {/if}
+            </div>
+        </div>
         </div>
       {/each}
     {/if}
   </div>
 </div>
+
+<!-- Delete confirmation dialog -->
+{#if confirmOpen}
+  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+    onclick={() => { if (!deleting) confirmOpen = false }}
+  >
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <div
+      class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-sm mx-4 flex flex-col gap-4 shadow-2xl"
+      onclick={e => e.stopPropagation()}
+    >
+      <h3 class="text-base font-semibold text-gray-100">Delete {selected.size === 1 ? 'torrent' : `${selected.size} torrents`}?</h3>
+      <p class="text-sm text-gray-400">
+        This will remove {selected.size === 1 ? 'the torrent' : 'the selected torrents'} from qBittorrent.
+      </p>
+
+      <button
+        onclick={() => deleteFiles = !deleteFiles}
+        class="flex items-center gap-3 select-none bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-left transition hover:border-gray-600"
+      >
+        <span class="shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition
+          {deleteFiles ? 'bg-teal-500 text-white' : 'bg-gray-700 border border-gray-600 text-transparent'}">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+          </svg>
+        </span>
+        <div class="flex flex-col">
+          <span class="text-sm text-gray-200 font-medium">Also delete files from disk</span>
+          <span class="text-xs text-gray-500">Permanently removes downloaded data</span>
+        </div>
+      </button>
+
+      <button
+        onclick={() => alsoMarkWatched = !alsoMarkWatched}
+        class="flex items-center gap-3 select-none bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-left transition hover:border-gray-600"
+      >
+        <span class="shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition
+          {alsoMarkWatched ? 'bg-teal-500 text-white' : 'bg-gray-700 border border-gray-600 text-transparent'}">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+          </svg>
+        </span>
+        <div class="flex flex-col">
+          <span class="text-sm text-gray-200 font-medium">Also mark as watched</span>
+          <span class="text-xs text-gray-500">Records in your watch history</span>
+        </div>
+      </button>
+
+      {#if deleteError}
+        <p class="text-red-400 text-xs">{deleteError}</p>
+      {/if}
+
+      <div class="flex gap-3 justify-end">
+        <button
+          onclick={() => confirmOpen = false}
+          disabled={deleting}
+          class="px-4 py-2 text-sm text-gray-400 hover:text-gray-200 disabled:opacity-40 transition"
+        >
+          Cancel
+        </button>
+        <button
+          onclick={handleDelete}
+          disabled={deleting}
+          class="px-4 py-2 bg-red-700 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-medium text-white transition"
+        >
+          {deleting ? 'Working…' : deleteConfirmLabel()}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}

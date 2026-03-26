@@ -9,6 +9,7 @@
   import TorrentSearch from './lib/TorrentSearch.svelte'
   import EpisodePicker from './lib/EpisodePicker.svelte'
   import BatchDownload from './lib/BatchDownload.svelte'
+  import DetailView from './lib/DetailView.svelte'
 
   // ---------- Routing ----------
   function parseHash() {
@@ -50,6 +51,7 @@
   let torrentEpisodeNumber = $state(null)
   let torrentEpisodeName  = $state(null)
   let batchEpisodes       = $state([])
+  let detailItem          = $state(null)
 
   // ---------- Browse state ----------
   const GENRES = {
@@ -196,6 +198,18 @@
       return
     }
 
+    const detailRoute = path.match(/^\/item\/(movie|tv)\/(\d+)$/)
+    if (detailRoute) {
+      activeView = 'detail'
+      detailItem = {
+        id:         Number(detailRoute[2]),
+        media_type: detailRoute[1],
+        title:      params.get('title') || '',
+        poster_url: params.get('poster') || null,
+      }
+      return
+    }
+
     // Default: browse
     const newTab    = params.get('tab')    || 'trending'
     const newQuery  = params.get('q')      || ''
@@ -229,6 +243,10 @@
   })
 
   // ---------- Navigation ----------
+  function openDetail(item) {
+    navigate(`/item/${item.media_type}/${item.id}`, { title: item.title, poster: item.poster_url })
+  }
+
   function openTorrentSearch(title, mediaType, tmdbId, posterUrl) {
     if (mediaType === 'tv') {
       navigate(`/tv/${tmdbId}/episodes`, { title, poster: posterUrl })
@@ -242,12 +260,12 @@
   <!-- Header -->
   <header class="sticky top-0 z-10 bg-gray-950/90 backdrop-blur border-b border-gray-800 px-4 py-3">
     <div class="max-w-7xl mx-auto flex items-center gap-3">
-      <div class="flex items-center gap-2 shrink-0">
+      <a href="#/" class="flex items-center gap-2 shrink-0">
         <span class="text-teal-400 text-xl">🎬</span>
-        <span class="font-bold text-lg tracking-tight text-white hidden sm:block">StreamScope</span>
-      </div>
+        <span class="font-bold text-lg tracking-tight text-white hidden sm:block">Filmhoard</span>
+      </a>
       <div class="flex-1 min-w-0">
-        <SearchBar bind:value={searchQuery} onSearch={(q) => browseTo({ q, genre: null })} />
+        <SearchBar value={searchQuery} onSearch={(q) => browseTo({ q, genre: null })} />
       </div>
       <button
         onclick={() => activeView === 'downloads' ? history.back() : navigate('/downloads')}
@@ -262,7 +280,13 @@
   </header>
 
   <main class="max-w-7xl mx-auto px-4 py-6">
-    {#if activeView === 'downloads'}
+    {#if activeView === 'detail' && detailItem}
+      <DetailView
+        item={detailItem}
+        onBack={() => history.back()}
+        onFindTorrents={openTorrentSearch}
+      />
+    {:else if activeView === 'downloads'}
       <Downloads />
     {:else if activeView === 'episode-picker'}
       <EpisodePicker
@@ -412,7 +436,7 @@
       <!-- Grid -->
       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
         {#each visibleResults as item (item.id + item.media_type)}
-          <MovieCard {item} onFindTorrents={openTorrentSearch} />
+          <MovieCard {item} onFindTorrents={openTorrentSearch} onViewDetail={openDetail} />
         {/each}
 
         <!-- Skeleton loaders -->

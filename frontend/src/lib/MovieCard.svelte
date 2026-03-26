@@ -1,13 +1,9 @@
 <script>
-  import { fetchProviders } from './api.js'
   import { getState, setFlag } from './itemStates.svelte.js'
 
-  let { item, onFindTorrents } = $props()
+  let { item, onFindTorrents, onViewDetail } = $props()
 
-  let expanded = $state(false)
-  let providers = $state(null)
-  let loadingProviders = $state(false)
-  let flagging = $state(null) // which flag is being saved
+  let flagging = $state(null)
 
   let state = $derived(getState(item.id, item.media_type))
 
@@ -17,20 +13,6 @@
     if (r >= 7.5) return 'text-emerald-400'
     if (r >= 6.0) return 'text-amber-400'
     return 'text-red-400'
-  }
-
-  async function toggleExpand() {
-    expanded = !expanded
-    if (expanded && !providers) {
-      loadingProviders = true
-      try {
-        providers = await fetchProviders(item.media_type, item.id)
-      } catch {
-        providers = { stream: [], rent: [], buy: [], link: null }
-      } finally {
-        loadingProviders = false
-      }
-    }
   }
 
   async function toggle(flag) {
@@ -45,14 +27,13 @@
 
 <div class="group relative flex flex-col bg-gray-900 rounded-xl overflow-hidden w-full border border-gray-800 hover:border-gray-600 transition-all duration-200 hover:scale-[1.02] hover:shadow-xl hover:shadow-black/50">
 
-  <!-- Poster (clickable to expand) -->
+  <!-- Poster (clickable to view detail) -->
   <div
     class="relative aspect-[2/3] w-full bg-gray-800 overflow-hidden cursor-pointer"
     role="button"
     tabindex="0"
-    aria-expanded={expanded}
-    onclick={toggleExpand}
-    onkeydown={(e) => e.key === 'Enter' && toggleExpand()}
+    onclick={() => onViewDetail(item)}
+    onkeydown={(e) => e.key === 'Enter' && onViewDetail(item)}
   >
     {#if item.poster_url}
       <img
@@ -141,65 +122,4 @@
     {/if}
   </div>
 
-  <!-- Expanded section -->
-  {#if expanded}
-    <div class="px-3 pb-3 border-t border-gray-800 pt-3 flex flex-col gap-3">
-      {#if item.overview}
-        <p class="text-xs text-gray-400 leading-relaxed line-clamp-4">{item.overview}</p>
-      {/if}
-
-      {#if loadingProviders}
-        <div class="flex gap-1">
-          {#each [1,2,3] as _}
-            <div class="w-8 h-8 rounded-md bg-gray-700 animate-pulse"></div>
-          {/each}
-        </div>
-      {:else if providers}
-        {#if providers.stream.length > 0}
-          <div>
-            <p class="text-[10px] uppercase tracking-wider text-teal-500 font-semibold mb-1.5">Stream</p>
-            <div class="flex flex-wrap gap-1.5">
-              {#each providers.stream as p}
-                <img src={p.logo_url} alt={p.name} title={p.name} class="w-8 h-8 rounded-md object-cover" loading="lazy" />
-              {/each}
-            </div>
-          </div>
-        {/if}
-        {#if providers.rent.length > 0}
-          <div>
-            <p class="text-[10px] uppercase tracking-wider text-amber-500 font-semibold mb-1.5">Rent</p>
-            <div class="flex flex-wrap gap-1.5">
-              {#each providers.rent as p}
-                <img src={p.logo_url} alt={p.name} title={p.name} class="w-8 h-8 rounded-md object-cover" loading="lazy" />
-              {/each}
-            </div>
-          </div>
-        {/if}
-        {#if providers.buy.length > 0}
-          <div>
-            <p class="text-[10px] uppercase tracking-wider text-blue-400 font-semibold mb-1.5">Buy</p>
-            <div class="flex flex-wrap gap-1.5">
-              {#each providers.buy as p}
-                <img src={p.logo_url} alt={p.name} title={p.name} class="w-8 h-8 rounded-md object-cover" loading="lazy" />
-              {/each}
-            </div>
-          </div>
-        {/if}
-        {#if providers.stream.length === 0 && providers.rent.length === 0 && providers.buy.length === 0}
-          <p class="text-xs text-gray-600">No streaming info available in your region.</p>
-        {/if}
-        {#if providers.link}
-          <a
-            href={providers.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-[10px] text-teal-500 hover:text-teal-400 underline mt-1"
-            onclick={(e) => e.stopPropagation()}
-          >
-            View on JustWatch →
-          </a>
-        {/if}
-      {/if}
-    </div>
-  {/if}
 </div>

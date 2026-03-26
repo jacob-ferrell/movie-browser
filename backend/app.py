@@ -81,6 +81,20 @@ def discover():
         return error(str(e))
 
 
+@app.get("/api/detail")
+def detail():
+    media_type = request.args.get("type")
+    tmdb_id = request.args.get("id")
+    if media_type not in ("movie", "tv"):
+        return error("type must be movie or tv", 400)
+    if not tmdb_id:
+        return error("id is required", 400)
+    try:
+        return jsonify(tmdb.get_detail(media_type, tmdb_id))
+    except Exception as e:
+        return error(str(e))
+
+
 @app.get("/api/providers")
 def providers():
     media_type = request.args.get("type")
@@ -109,6 +123,33 @@ def qbt_add():
             category=body.get("category"),
         )
         return jsonify({"ok": True})
+    except Exception as e:
+        return error(str(e))
+
+
+@app.post("/api/qbt/delete")
+def qbt_delete():
+    body = request.get_json(silent=True) or {}
+    hashes = body.get("hashes", [])
+    delete_files = bool(body.get("delete_files", False))
+    if not hashes or not isinstance(hashes, list):
+        return error("hashes must be a non-empty list", 400)
+    try:
+        qbt.delete_torrents(hashes, delete_files=delete_files)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return error(str(e))
+
+
+@app.post("/api/qbt/mark-watched")
+def qbt_mark_watched():
+    body = request.get_json(silent=True) or {}
+    hashes = body.get("hashes", [])
+    if not hashes or not isinstance(hashes, list):
+        return error("hashes must be a non-empty list", 400)
+    try:
+        count = db.mark_watched_by_hashes(hashes)
+        return jsonify({"ok": True, "marked": count})
     except Exception as e:
         return error(str(e))
 
