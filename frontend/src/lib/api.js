@@ -109,6 +109,57 @@ export function searchTorrents(query) {
   return get(`/torrent/search?q=${encodeURIComponent(query)}`)
 }
 
+export function fetchFileSize(path) {
+  return get(`/files/size?path=${encodeURIComponent(path)}`)
+}
+
+export function fetchDiskUsage() {
+  return get('/files/disk')
+}
+
+export function listFiles(path) {
+  return get(`/files/list?path=${encodeURIComponent(path)}`)
+}
+
+export async function deleteFiles(paths) {
+  const resp = await fetch(`${BASE}/files/delete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paths }),
+  })
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}))
+    throw new Error(body.error || `HTTP ${resp.status}`)
+  }
+  return resp.json()
+}
+
+export async function renameFile(path, new_name) {
+  const resp = await fetch(`${BASE}/files/rename`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, new_name }),
+  })
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}))
+    throw new Error(body.error || `HTTP ${resp.status}`)
+  }
+  return resp.json()
+}
+
+export async function moveFiles(paths, dest_dir) {
+  const resp = await fetch(`${BASE}/files/move`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paths, dest_dir }),
+  })
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}))
+    throw new Error(body.error || `HTTP ${resp.status}`)
+  }
+  return resp.json()
+}
+
 export async function markItem(tmdbId, mediaType, title, posterUrl, flag, value = true) {
   const resp = await fetch(`${BASE}/items/mark`, {
     method: 'POST',

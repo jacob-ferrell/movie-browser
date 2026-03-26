@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import tmdb
 import qbt
 import db
+import files as fs
 
 load_dotenv()
 
@@ -290,6 +291,105 @@ def torrent_search():
         return jsonify(resp.json())
     except Exception as e:
         return error(str(e))
+
+
+@app.get("/api/files/size")
+def files_size():
+    path = request.args.get("path", "").strip()
+    if not path:
+        return error("path required", 400)
+    try:
+        return jsonify({"size": fs.path_size(path)})
+    except PermissionError as e:
+        return error(str(e), 403)
+    except Exception as e:
+        return error(str(e))
+
+
+@app.get("/api/files/disk")
+def files_disk():
+    try:
+        return jsonify(fs.disk_usage())
+    except Exception as e:
+        return error(str(e))
+
+
+@app.get("/api/files/list")
+def files_list():
+    path = request.args.get("path", "/hdd").rstrip("/") or "/hdd"
+    try:
+        entries = fs.list_dir(path)
+        # Cross-reference dirs with downloads table to find associated torrent hashes
+        dir_paths = [e["path"] for e in entries if e["is_dir"]]
+        torrent_map = db.get_hashes_by_paths(dir_paths) if dir_paths else {}
+        for e in entries:
+            e["torrent_hash"] = torrent_map.get(e["path"])
+        return jsonify({"entries": entries, "path": path})
+    except PermissionError as e:
+        return error(str(e), 403)
+    except NotADirectoryError as e:
+        return error(str(e), 400)
+    except Exception as e:
+        return error(str(e))
+
+
+@app.post("/api/files/delete")
+def files_delete():
+    body = request.get_json(silent=True) or {}
+    paths = body.get("paths", [])
+    if not paths or not isinstance(paths, list):
+        return error("paths must be a non-empty list", 400)
+    errs = []
+    for p in paths:
+        try:
+            fs.delete_path(p)
+        except PermissionError as e:
+            return error(str(e), 403)
+        except Exception as e:
+            errs.append(str(e))
+    if errs:
+        return error("; ".join(errs))
+    return jsonify({"ok": True})
+
+
+@app.post("/api/files/rename")
+def files_rename():
+    body = request.get_json(silent=True) or {}
+    path = (body.get("path") or "").strip()
+    new_name = (body.get("new_name") or "").strip()
+    if not path or not new_name:
+        return error("path and new_name are required", 400)
+    try:
+        fs.rename_path(path, new_name)
+        return jsonify({"ok": True})
+    except PermissionError as e:
+        return error(str(e), 403)
+    except (ValueError, FileExistsError) as e:
+        return error(str(e), 400)
+    except Exception as e:
+        return error(str(e))
+
+
+@app.post("/api/files/move")
+def files_move():
+    body = request.get_json(silent=True) or {}
+    paths = body.get("paths", [])
+    dest_dir = (body.get("dest_dir") or "").strip()
+    if not paths or not dest_dir:
+        return error("paths and dest_dir are required", 400)
+    errs = []
+    for p in paths:
+        try:
+            fs.move_path(p, dest_dir)
+        except PermissionError as e:
+            return error(str(e), 403)
+        except (FileExistsError, NotADirectoryError) as e:
+            errs.append(str(e))
+        except Exception as e:
+            errs.append(str(e))
+    if errs:
+        return error("; ".join(errs))
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":

@@ -3,6 +3,8 @@ services:
     build: ./backend
     env_file: ./backend/.env
     restart: unless-stopped
+    volumes:
+      - /hdd:/hdd
     # Not exposed externally — only reachable by the frontend container
 
   frontend:

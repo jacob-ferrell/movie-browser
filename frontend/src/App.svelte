@@ -6,6 +6,7 @@
   import FilterBar from './lib/FilterBar.svelte'
   import SearchBar from './lib/SearchBar.svelte'
   import Downloads from './lib/Downloads.svelte'
+  import FileManager from './lib/FileManager.svelte'
   import TorrentSearch from './lib/TorrentSearch.svelte'
   import EpisodePicker from './lib/EpisodePicker.svelte'
   import BatchDownload from './lib/BatchDownload.svelte'
@@ -43,6 +44,7 @@
 
   // ---------- View state ----------
   let activeView          = $state('browse')
+  let filesPath           = $state('/hdd')
   let torrentTitle        = $state('')
   let torrentMediaType    = $state('movie')
   let torrentTmdbId       = $state(null)
@@ -164,6 +166,12 @@
       return
     }
 
+    if (path === '/files') {
+      activeView = 'files'
+      filesPath = params.get('path') || '/hdd'
+      return
+    }
+
     const tvEp = path.match(/^\/tv\/(\d+)\/episodes$/)
     if (tvEp) {
       activeView      = 'episode-picker'
@@ -276,6 +284,15 @@
         </svg>
         <span class="hidden sm:block">Downloads</span>
       </button>
+      <button
+        onclick={() => activeView === 'files' ? history.back() : navigate('/files')}
+        class="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition {activeView === 'files' ? 'bg-teal-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+        </svg>
+        <span class="hidden sm:block">Files</span>
+      </button>
     </div>
   </header>
 
@@ -288,6 +305,8 @@
       />
     {:else if activeView === 'downloads'}
       <Downloads />
+    {:else if activeView === 'files'}
+      <FileManager path={filesPath} />
     {:else if activeView === 'episode-picker'}
       <EpisodePicker
         title={torrentTitle}

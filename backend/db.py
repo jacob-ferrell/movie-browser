@@ -158,6 +158,26 @@ def get_items_by_flag(flag):
         return [dict(r) for r in cur.fetchall()]
 
 
+def get_hashes_by_paths(paths):
+    """Return {save_path: torrent_hash} for the given save_paths.
+    Normalizes trailing slashes so /hdd/Movies/Foo and /hdd/Movies/Foo/ both match."""
+    if not paths:
+        return {}
+    normalized = [p.rstrip('/') for p in paths]
+    placeholders = ','.join(['%s'] * len(normalized))
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(f"""
+            SELECT DISTINCT ON (rtrim(save_path, '/'))
+                rtrim(save_path, '/') AS save_path,
+                torrent_hash
+            FROM downloads
+            WHERE rtrim(save_path, '/') IN ({placeholders})
+              AND torrent_hash IS NOT NULL
+            ORDER BY rtrim(save_path, '/'), added_at DESC
+        """, normalized)
+        return {row[0]: row[1] for row in cur.fetchall()}
+
+
 def get_item(tmdb_id, media_type):
     with _conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
