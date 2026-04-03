@@ -1,6 +1,7 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
+import os
 import tmdb
 import qbt
 import db
@@ -365,6 +366,24 @@ def files_rename():
     except PermissionError as e:
         return error(str(e), 403)
     except (ValueError, FileExistsError) as e:
+        return error(str(e), 400)
+    except Exception as e:
+        return error(str(e))
+
+
+@app.get("/api/files/download")
+def files_download():
+    path = request.args.get("path", "").strip()
+    if not path:
+        return error("path is required", 400)
+    try:
+        real = fs._safe(path)
+        if not os.path.isfile(real):
+            return error("Path is not a file", 400)
+        return send_file(real, as_attachment=True)
+    except PermissionError as e:
+        return error(str(e), 403)
+    except (FileNotFoundError, IsADirectoryError) as e:
         return error(str(e), 400)
     except Exception as e:
         return error(str(e))
