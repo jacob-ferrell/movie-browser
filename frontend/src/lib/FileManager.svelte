@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte'
-  import { listFiles, deleteFiles, renameFile, moveFiles, deleteTorrents, fetchDiskUsage } from './api.js'
+  import { listFiles, deleteFiles, renameFile, moveFiles, deleteTorrents, fetchDiskUsage, downloadFile } from './api.js'
 
   const ROOT = '/hdd'
 
@@ -36,6 +36,12 @@
   let moveLoading = $state(false)
   let moveError = $state(null)
   let moving = $state(false)
+
+  // Derived: true when exactly one non-directory is selected (downloadable)
+  let canDownload = $derived(
+    selected.size === 1 &&
+    entries.some(e => selected.has(e.path) && !e.is_dir)
+  )
 
   // Derived: selected entries that have a torrent_hash (for delete dialog)
   let selectedTorrentHashes = $derived(
@@ -411,6 +417,14 @@
         class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs font-medium text-gray-200 transition"
       >
         Rename
+      </button>
+    {/if}
+    {#if canDownload}
+      <button
+        onclick={() => downloadFile([...selected][0])}
+        class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs font-medium text-gray-200 transition"
+      >
+        Download
       </button>
     {/if}
     <button

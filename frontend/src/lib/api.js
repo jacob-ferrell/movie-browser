@@ -117,6 +117,15 @@ export function fetchDiskUsage() {
   return get('/files/disk')
 }
 
+export function downloadFile(path) {
+  const a = document.createElement('a')
+  a.href = `${BASE}/files/download?path=${encodeURIComponent(path)}`
+  a.download = ''
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
+
 export function listFiles(path) {
   return get(`/files/list?path=${encodeURIComponent(path)}`)
 }
